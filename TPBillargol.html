@@ -186,7 +186,6 @@
     agujeros.push(createHole(-9.5, 0));
     agujeros.push(createHole(9.5, 0));
 
-
     function detectarColisionConAgujeros() {
       agujeros.forEach(hole => {
         const distancia = pelota.position.distanceTo(hole.position);
@@ -199,7 +198,6 @@
       });
     }
 
-
     // Función para mover la pelota con física
     function moverPelota() {
       // Aplicar la velocidad a la posición de la pelota
@@ -209,12 +207,12 @@
       pelota.position.y = 0.5; // Altura fija de la pelota sobre la mesa
 
       // Rebotar contra las paredes (X y Z)
-      if (pelota.position.x > 9.70 || pelota.position.x < -9.70) {
+      if (pelota.position.x > 9.50 || pelota.position.x < -9.50) {
         velocidad.x *= -1; // Invertir la dirección X
         velocidad.multiplyScalar(0.9); // Simular fricción
       }
 
-      if (pelota.position.z > 4.70 || pelota.position.z < -4.70) {
+      if (pelota.position.z > 4.50 || pelota.position.z < -4.50) {
         velocidad.z *= -1; // Invertir la dirección Z
         velocidad.multiplyScalar(0.9); // Simular fricción
       }
@@ -241,16 +239,13 @@
         }
     }
 
-
-
-
     // Configurar la cámara para seguir la pelota desde un ángulo 3D
     function actualizarCamara() {
       const offset = new THREE.Vector3(-5, 10, 5); // Posición relativa (detrás y arriba)
       camera.position.copy(pelota.position.clone().add(offset)); // Seguir la pelota
       camera.lookAt(pelota.position); // Enfocar siempre la pelota
     }
-    
+
     const clock = new THREE.Clock();
     
     // Animación principal
@@ -264,12 +259,17 @@
       detectarColisionConAgujeros(); // Detectar si la pelota pasa por un agujero
       actualizarCamara(); // Actualizar la cámara
       actualizarRotacionPelota(deltaTime);
+      //actualizarTaco();
       renderer.render(scene, camera);
     }
 
     // Luz básica
-    const light = new THREE.AmbientLight(0xffffff, 1); // Luz ambiental
-    scene.add(light);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); // Luz ambiental
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    directionalLight.position.set(10, 10, 10);
+    scene.add(directionalLight);
 
     animate();
   </script>
