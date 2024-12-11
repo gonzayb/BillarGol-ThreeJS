@@ -132,32 +132,122 @@
     }
     crearPelota();
 
+    const tacoGeometry = new THREE.CylinderGeometry(0.05, 0.1, 8, 32); // Taco delgado y largo
+    const tacoMaterial = new THREE.MeshStandardMaterial({
+        map: wallTexture, // Asignar la textura al material
+    });
+    const taco = new THREE.Mesh(tacoGeometry, tacoMaterial);
+
+    // Coloca el taco en la escena, detrás de la pelota inicialmente
+    tacoGeometry.rotateX(Math.PI / 2); // Alinea el cilindro en el eje Z  
+    taco.position.set(pelota.position.x - 1, 0.1, pelota.position.z); // Cerca de la pelota
+    scene.add(taco);
+
     // Detectar la posición del mouse en la escena
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
+
     document.addEventListener('mousemove', (event) => {
-      // Convertir las coordenadas del mouse a coordenadas de la escena (-1 a 1)
-      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    });
-
-    // Detectar la posición del mouse en la escena
-    document.addEventListener('click', (event) => {
-      // Convertir las coordenadas del mouse a coordenadas de la escena (-1 a 1)
+      // Actualiza las coordenadas del mouse
       mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
       mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-      // Usar el raycaster para detectar el punto de clic en la mesa
+      // Raycaster para encontrar el punto en la mesa
       raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObject(table); // Intersección con la mesa
+      const intersects = raycaster.intersectObject(table);
 
       if (intersects.length > 0) {
-        const point = intersects[0].point; // Punto de impacto
-        // Calcular la dirección normalizada hacia el punto
-        direccion = new THREE.Vector3(point.x - pelota.position.x, 0, point.z - pelota.position.z).normalize();
-        velocidad = direccion.multiplyScalar(0.5); // Velocidad inicial
+        const point = intersects[0].point; // Punto en la mesa
+        // Calcula la dirección del taco
+        const direction = new THREE.Vector3(
+          point.x - pelota.position.x,
+          0,
+          point.z - pelota.position.z
+        ).normalize();
+
+        // Coloca el taco en posición orientado hacia la pelota
+        const distance = 5; // Distancia del taco a la pelota
+        taco.position.set(
+          pelota.position.x - direction.x * distance,
+          0.5,
+          pelota.position.z - direction.z * distance
+        );
+
+        // Apunta el taco hacia la pelota
+        taco.lookAt(pelota.position);
       }
     });
+
+
+    // Detectar la posición del mouse en la escena
+    document.addEventListener('click', () => {
+    // Usar el raycaster para detectar el punto de clic en la mesa
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObject(table);
+
+    if (intersects.length > 0) {
+      const point = intersects[0].point;
+
+      // Dirección del golpe
+      const direction = new THREE.Vector3(
+        point.x - pelota.position.x,
+        0,
+        point.z - pelota.position.z
+      ).normalize();
+
+      // Animación del taco
+      const initialPosition = taco.position.clone(); // Guarda la posición inicial
+      const hitPosition = new THREE.Vector3(
+        pelota.position.x - direction.x * 0.5,
+        0.1,
+        pelota.position.z - direction.z * 0.5
+      );
+
+      // Mueve el taco hacia la pelota y de vuelta
+      const duration = 0.5; // Duración del golpe
+      let progress = 0;
+      const animateTaco = () => {
+        progress += 0.1;
+        if (progress <= duration) {
+          const t = progress / duration; // Interpolación
+          taco.position.lerpVectors(initialPosition, hitPosition, t);
+          requestAnimationFrame(animateTaco);
+        } else {
+          // Regresa el taco a su posición original
+          taco.position.copy(initialPosition);
+        }
+      };
+      animateTaco();
+
+      // Aplica fuerza a la pelota
+      velocidad = direction.multiplyScalar(0.5); // Ajusta la velocidad del golpe
+    }
+  });
+
+
+    function actualizarTaco() {
+        // Configurar el rayo a partir de la cámara y la posición del mouse
+        raycaster.setFromCamera(mouse, camera);
+
+        // Detectar la intersección con el plano de la mesa
+        const intersecciones = raycaster.intersectObject(mesa);
+        if (intersecciones.length > 0) {
+            const puntoInterseccion = intersecciones[0].point; // Punto donde el mouse apunta
+
+            // Calcular la dirección desde la pelota hacia el punto de intersección
+            const direccion = new THREE.Vector3()
+                .subVectors(puntoInterseccion, pelota.position)
+                .normalize();
+
+            // Posicionar el taco cerca de la pelota y apuntar hacia la dirección
+            taco.position.copy(pelota.position); // Posicionar el taco en el centro de la pelota
+            taco.position.add(direccion.clone().multiplyScalar(-2.5)); // Moverlo hacia atrás
+
+            // Orientar el taco hacia el punto de intersección
+            taco.lookAt(puntoInterseccion);
+        }
+    }
+
 
     function detectarColisiones() {
       hongos.children.forEach(hongo => {
