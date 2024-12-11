@@ -18,7 +18,7 @@
     const textureLoader = new THREE.TextureLoader();
     const wallTexture = textureLoader.load('Wood066_1K-JPG_Color.jpg'); // Ruta de textura
     const ballTexture = textureLoader.load('Plastic013A_1K-JPG_Color.jpg');
-    const groundTexture = textureLoader.load('Grass004_1K-JPG_Color.jpg');
+    const groundTexture = textureLoader.load('fabrics_0075_color_1k.jpg');
     const mushroomTexture = textureLoader.load('Plaster001_1K-JPG_Color.jpg');
 
 
@@ -26,6 +26,13 @@
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(0, 10, 20);
     camera.lookAt(0, 0, 0);
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
 
     // Crear el renderer
     const renderer = new THREE.WebGLRenderer();
@@ -71,6 +78,12 @@
     wall4.position.set(-10.25, wallHeight / 2, 0); // Izquierda
     scene.add(wall4);
 
+    const limitesMesa = new THREE.Box3(
+      new THREE.Vector3(-9.5, 0, -4.5), // Esquina inferior izquierda
+      new THREE.Vector3(9.5, 1, 4.5)   // Esquina superior derecha
+    );
+
+
     function createHole(x, z) {
       const holeGeometry = new THREE.CircleGeometry(0.5, 32);
       const holeMaterial = new THREE.MeshPhongMaterial({ color: 0x000000 }); // Responderá a la luz
@@ -91,12 +104,12 @@
 
     // Crear hongos y agregarlos al grupo
     function createHongo(x, z) {
-      const hongoGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1.5, 32);
+      const hongoGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1, 32);
       const hongoMaterial = new THREE.MeshStandardMaterial({
         map: mushroomTexture, // Asignar la textura al material
     });
       const hongo = new THREE.Mesh(hongoGeometry, hongoMaterial);
-      hongo.position.set(x, 0, z); // Elevarlos ligeramente sobre la mesa
+      hongo.position.set(x, 0.5, z); // Elevarlos ligeramente sobre la mesa
       hongos.add(hongo); // Agregar al grupo
     }
 
@@ -224,36 +237,21 @@
     }
   });
 
+  // Crear una bounding sphere para la pelota
+  const boundingPelota = new THREE.Sphere(pelota.position, 0.5); // Radio = 0.5
 
-    function actualizarTaco() {
-        // Configurar el rayo a partir de la cámara y la posición del mouse
-        raycaster.setFromCamera(mouse, camera);
-
-        // Detectar la intersección con el plano de la mesa
-        const intersecciones = raycaster.intersectObject(mesa);
-        if (intersecciones.length > 0) {
-            const puntoInterseccion = intersecciones[0].point; // Punto donde el mouse apunta
-
-            // Calcular la dirección desde la pelota hacia el punto de intersección
-            const direccion = new THREE.Vector3()
-                .subVectors(puntoInterseccion, pelota.position)
-                .normalize();
-
-            // Posicionar el taco cerca de la pelota y apuntar hacia la dirección
-            taco.position.copy(pelota.position); // Posicionar el taco en el centro de la pelota
-            taco.position.add(direccion.clone().multiplyScalar(-2.5)); // Moverlo hacia atrás
-
-            // Orientar el taco hacia el punto de intersección
-            taco.lookAt(puntoInterseccion);
-        }
-    }
+  // Crear bounding spheres para los hongos
+  hongos.children.forEach(hongo => {
+    hongo.boundingSphere = new THREE.Sphere(hongo.position.clone(), 0.2); // Radio = 0.2
+  });
 
 
-    function detectarColisiones() {
+  function detectarColisiones() {
+      // Actualizar la posición de la bounding sphere de la pelota
+      boundingPelota.center.copy(pelota.position);
+
       hongos.children.forEach(hongo => {
-        const distancia = pelota.position.distanceTo(hongo.position);
-
-        if (distancia < 0.7) { // Suma de los radios (0.5 para la pelota + 0.2 para el hongo)
+        if (boundingPelota.intersectsSphere(hongo.boundingSphere)) {
           // Calcular el vector normal del rebote en el plano x-z
           const normal = new THREE.Vector3().subVectors(pelota.position, hongo.position);
           normal.y = 0; // Ignorar la componente vertical
@@ -263,12 +261,14 @@
           velocidad.reflect(normal);
           velocidad.y = 0; // Asegurarse de que la velocidad no tenga componente en Y
           velocidad.multiplyScalar(0.98); // Reducir ligeramente la velocidad tras el rebote
+
+          // Asegurarse de que la velocidad no sea demasiado pequeña
           if (Math.abs(velocidad.x) < 0.05) velocidad.x = Math.sign(velocidad.x) * 0.01;
           if (Math.abs(velocidad.z) < 0.05) velocidad.z = Math.sign(velocidad.z) * 0.01;
-
         }
       });
     }
+
 
     const agujeros = []; // Array para almacenar los agujeros
 
@@ -280,7 +280,7 @@
       agujeros.forEach(hole => {
         const distancia = pelota.position.distanceTo(hole.position);
         
-        if (distancia < 0.5 && velocidad.length() < 0.4) { // Radio del agujero y velocidad baja
+        if (distancia < 0.6 && velocidad.length() < 0.4) { // Radio del agujero y velocidad baja
           // Reiniciar posición de la pelota
           pelota.position.set(0, 0.5, 0); // Posición inicial
           velocidad.set(0, 0, 0); // Detener la pelota
@@ -317,17 +317,21 @@
     }
 
     function actualizarRotacionPelota(deltaTime) {
-        // Velocidad angular proporcional a la velocidad lineal
-        const velocidadAngular = velocidad.length() * deltaTime * 0.5; // Ajustar constante según el tamaño de la pelota
+      // Asegúrate de que las variables velocidad y pelota existan y estén inicializadas
+      if (!velocidad || !pelota) return;
 
-        // Eje de rotación: perpendicular al movimiento en el plano XZ
-        const eje = new THREE.Vector3(-velocidad.z, 0, velocidad.x).normalize();
+      // Velocidad angular calculada en base a la velocidad de la pelota
+      const velocidadMagnitud = velocidad.length();
+      const radioPelota = pelota.geometry.parameters.radius; // Asegúrate de usar el radio correcto
+      const rotacionAngular = (velocidadMagnitud / radioPelota) * deltaTime;
 
-        // Aplicar la rotación en el eje calculado
-        if (velocidad.length() > 0) {
-            pelota.rotateOnAxis(eje, velocidadAngular);
-        }
+      // Dirección de la rotación en función del movimiento de la pelota
+      const ejeRotacion = new THREE.Vector3(velocidad.z, 0, -velocidad.x).normalize();
+
+      // Aplica la rotación a la pelota
+      pelota.rotateOnWorldAxis(ejeRotacion, rotacionAngular);
     }
+
 
     // Configurar la cámara para seguir la pelota desde un ángulo 3D
     function actualizarCamara() {
@@ -349,12 +353,11 @@
       detectarColisionConAgujeros(); // Detectar si la pelota pasa por un agujero
       actualizarCamara(); // Actualizar la cámara
       actualizarRotacionPelota(deltaTime);
-      //actualizarTaco();
       renderer.render(scene, camera);
     }
 
     // Luz básica
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); // Luz ambiental
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7); // Luz ambiental
     scene.add(ambientLight);
 
     const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
