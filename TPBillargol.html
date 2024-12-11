@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Billargol - Mesa</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/110/three.min.js"></script>
+</head>
+<body>
+  <script>
+    // Crear la escena
+    const scene = new THREE.Scene();
+
+    //Texturas
+    const loader = new THREE.TextureLoader();
+    
+    // Cargar texturas
+    const textureLoader = new THREE.TextureLoader();
+    const wallTexture = textureLoader.load('Wood066_1K-JPG_Color.jpg'); // Ruta de textura
+    const ballTexture = textureLoader.load('Plastic013A_1K-JPG_Color.jpg');
+    const groundTexture = textureLoader.load('Grass004_1K-JPG_Color.jpg');
+    const mushroomTexture = textureLoader.load('Plaster001_1K-JPG_Color.jpg');
+
+
+    // Crear la cámara
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 10, 20);
+    camera.lookAt(0, 0, 0);
+
+    // Crear el renderer
+    const renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // Crear el campo verde (mesa)
+    const tableGeometry = new THREE.BoxGeometry(20, 0.5, 10); // Ancho, alto, profundidad
+    const tableMaterial = new THREE.MeshStandardMaterial({
+        map: groundTexture, // Asignar la textura al material
+    });
+    const table = new THREE.Mesh(tableGeometry, tableMaterial);
+    table.position.y = -0.25; // Para que quede sobre el plano XZ
+    scene.add(table);
+
+    // Crear un material con textura para las paredes
+    const wallMaterial = new THREE.MeshStandardMaterial({
+        map: wallTexture, // Asignar la textura al material
+    });
+
+    // Configuración de repetición de textura (opcional)
+    wallTexture.wrapS = THREE.RepeatWrapping;
+    wallTexture.wrapT = THREE.RepeatWrapping;
+    wallTexture.repeat.set(4, 1); // Repetir la textura 4 veces en el ancho y 1 vez en la altura
+    const wallThickness = 0.5;
+    const wallHeight = 1;
+    
+    // Paredes laterales
+    const wall1 = new THREE.Mesh(new THREE.BoxGeometry(20, wallHeight, wallThickness), wallMaterial);
+    wall1.position.set(0, wallHeight / 2, 5.25); // Lado superior
+    scene.add(wall1);
+
+    const wall2 = new THREE.Mesh(new THREE.BoxGeometry(20, wallHeight, wallThickness), wallMaterial);
+    wall2.position.set(0, wallHeight / 2, -5.25); // Lado inferior
+    scene.add(wall2);
+
+    // Paredes frontales
+    const wall3 = new THREE.Mesh(new THREE.BoxGeometry(wallThickness, wallHeight, 10), wallMaterial);
+    wall3.position.set(10.25, wallHeight / 2, 0); // Derecha
+    scene.add(wall3);
+
+    const wall4 = new THREE.Mesh(new THREE.BoxGeometry(wallThickness, wallHeight, 10), wallMaterial);
+    wall4.position.set(-10.25, wallHeight / 2, 0); // Izquierda
+    scene.add(wall4);
+
+    function createHole(x, z) {
+      const holeGeometry = new THREE.CircleGeometry(0.5, 32);
+      const holeMaterial = new THREE.MeshPhongMaterial({ color: 0x000000 }); // Responderá a la luz
+      const hole = new THREE.Mesh(holeGeometry, holeMaterial);
+      hole.rotation.x = -Math.PI / 2;
+      hole.position.set(x, 0.01, z); // Elevar ligeramente
+      scene.add(hole);
+      return hole; // Retornar el agujero creado
+    }
+
+    // Agujero izquierdo
+    createHole(-9.5, 0);
+    // Agujero derecho
+    createHole(9.5, 0);
+
+    const hongos = new THREE.Group();
+    scene.add(hongos);
+
+    // Crear hongos y agregarlos al grupo
+    function createHongo(x, z) {
+      const hongoGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1.5, 32);
+      const hongoMaterial = new THREE.MeshStandardMaterial({
+        map: mushroomTexture, // Asignar la textura al material
+    });
+      const hongo = new THREE.Mesh(hongoGeometry, hongoMaterial);
+      hongo.position.set(x, 0, z); // Elevarlos ligeramente sobre la mesa
+      hongos.add(hongo); // Agregar al grupo
+    }
+
+
+    // Distribuir hongos centrales
+    const hongoPositions = [
+      { x: 0, z: 1 },
+      { x: 0, z: 2.5 }, { x: -1, z: 0 }, { x: -2.5, z: 0 },
+      { x: 0, z: -2.5 }, { x: 0, z: -1 }, { x: 2.5, z: 0 }, { x: 1, z: 0 }
+    ];
+    hongoPositions.forEach(pos => createHongo(pos.x, pos.z));
+
+    // Hongos adicionales cerca de los agujeros
+    createHongo(-9.5, 1);
+    createHongo(-9.5, -1);
+    createHongo(9.5, 1);
+    createHongo(9.5, -1);
+
+    let pelota, velocidad = new THREE.Vector3(0, 0, 0);
+    const velocidadBase = 0.5; // Velocidad constante para el movimiento
+    let direccion = new THREE.Vector3();
+    let velocidadInicial = 0;
+
+    // Crear la pelota
+    function crearPelota() {
+      const pelotaGeometry = new THREE.SphereGeometry(0.5, 32, 32);
+      const pelotaMaterial = new THREE.MeshStandardMaterial({
+        map: ballTexture, // Asignar la textura al material
+    });
+      pelota = new THREE.Mesh(pelotaGeometry, pelotaMaterial);
+      pelota.position.set(0, 0.5, 0); // Posición inicial en el centro
+      scene.add(pelota);
+    }
+    crearPelota();
+
+    // Detectar la posición del mouse en la escena
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    document.addEventListener('mousemove', (event) => {
+      // Convertir las coordenadas del mouse a coordenadas de la escena (-1 a 1)
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    });
+
+    // Detectar la posición del mouse en la escena
+    document.addEventListener('click', (event) => {
+      // Convertir las coordenadas del mouse a coordenadas de la escena (-1 a 1)
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+      // Usar el raycaster para detectar el punto de clic en la mesa
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObject(table); // Intersección con la mesa
+
+      if (intersects.length > 0) {
+        const point = intersects[0].point; // Punto de impacto
+        // Calcular la dirección normalizada hacia el punto
+        direccion = new THREE.Vector3(point.x - pelota.position.x, 0, point.z - pelota.position.z).normalize();
+        velocidad = direccion.multiplyScalar(0.5); // Velocidad inicial
+      }
+    });
+
+    function detectarColisiones() {
+      hongos.children.forEach(hongo => {
+        const distancia = pelota.position.distanceTo(hongo.position);
+
+        if (distancia < 0.7) { // Suma de los radios (0.5 para la pelota + 0.2 para el hongo)
+          // Calcular el vector normal del rebote en el plano x-z
+          const normal = new THREE.Vector3().subVectors(pelota.position, hongo.position);
+          normal.y = 0; // Ignorar la componente vertical
+          normal.normalize();
+
+          // Reflejar la velocidad en la normal
+          velocidad.reflect(normal);
+          velocidad.y = 0; // Asegurarse de que la velocidad no tenga componente en Y
+          velocidad.multiplyScalar(0.98); // Reducir ligeramente la velocidad tras el rebote
+          if (Math.abs(velocidad.x) < 0.05) velocidad.x = Math.sign(velocidad.x) * 0.01;
+          if (Math.abs(velocidad.z) < 0.05) velocidad.z = Math.sign(velocidad.z) * 0.01;
+
+        }
+      });
+    }
+
+    const agujeros = []; // Array para almacenar los agujeros
+
+    // Crear agujeros y almacenarlos en el array
+    agujeros.push(createHole(-9.5, 0));
+    agujeros.push(createHole(9.5, 0));
+
+
+    function detectarColisionConAgujeros() {
+      agujeros.forEach(hole => {
+        const distancia = pelota.position.distanceTo(hole.position);
+        
+        if (distancia < 0.5 && velocidad.length() < 0.4) { // Radio del agujero y velocidad baja
+          // Reiniciar posición de la pelota
+          pelota.position.set(0, 0.5, 0); // Posición inicial
+          velocidad.set(0, 0, 0); // Detener la pelota
+        }
+      });
+    }
+
+
+    // Función para mover la pelota con física
+    function moverPelota() {
+      // Aplicar la velocidad a la posición de la pelota
+      pelota.position.add(velocidad);
+
+      // Mantener la pelota en el plano XZ
+      pelota.position.y = 0.5; // Altura fija de la pelota sobre la mesa
+
+      // Rebotar contra las paredes (X y Z)
+      if (pelota.position.x > 9.70 || pelota.position.x < -9.70) {
+        velocidad.x *= -1; // Invertir la dirección X
+        velocidad.multiplyScalar(0.9); // Simular fricción
+      }
+
+      if (pelota.position.z > 4.70 || pelota.position.z < -4.70) {
+        velocidad.z *= -1; // Invertir la dirección Z
+        velocidad.multiplyScalar(0.9); // Simular fricción
+      }
+
+      // Aplicar fricción gradual
+      velocidad.multiplyScalar(0.99);
+
+      // Detener la pelota si la velocidad es muy baja
+      if (velocidad.length() < 0.01) {
+        velocidad.set(0, 0, 0);
+      }
+    }
+
+    function actualizarRotacionPelota(deltaTime) {
+        // Velocidad angular proporcional a la velocidad lineal
+        const velocidadAngular = velocidad.length() * deltaTime * 0.5; // Ajustar constante según el tamaño de la pelota
+
+        // Eje de rotación: perpendicular al movimiento en el plano XZ
+        const eje = new THREE.Vector3(-velocidad.z, 0, velocidad.x).normalize();
+
+        // Aplicar la rotación en el eje calculado
+        if (velocidad.length() > 0) {
+            pelota.rotateOnAxis(eje, velocidadAngular);
+        }
+    }
+
+
+
+
+    // Configurar la cámara para seguir la pelota desde un ángulo 3D
+    function actualizarCamara() {
+      const offset = new THREE.Vector3(-5, 10, 5); // Posición relativa (detrás y arriba)
+      camera.position.copy(pelota.position.clone().add(offset)); // Seguir la pelota
+      camera.lookAt(pelota.position); // Enfocar siempre la pelota
+    }
+    
+    const clock = new THREE.Clock();
+    
+    // Animación principal
+    function animate() {
+      requestAnimationFrame(animate);
+      // Calcular deltaTime
+      const deltaTime = clock.getDelta(); // Tiempo en segundos desde el último frame
+      // Actualizar la rotación de la pelota
+      moverPelota(); // Mover la pelota
+      detectarColisiones(); // Detectar colisiones con los hongos
+      detectarColisionConAgujeros(); // Detectar si la pelota pasa por un agujero
+      actualizarCamara(); // Actualizar la cámara
+      actualizarRotacionPelota(deltaTime);
+      renderer.render(scene, camera);
+    }
+
+    // Luz básica
+    const light = new THREE.AmbientLight(0xffffff, 1); // Luz ambiental
+    scene.add(light);
+
+    animate();
+  </script>
+</body>
+</html>
