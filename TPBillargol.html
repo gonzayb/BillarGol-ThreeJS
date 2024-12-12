@@ -17,7 +17,8 @@
     // Cargar texturas
     const textureLoader = new THREE.TextureLoader();
     const wallTexture = textureLoader.load('Wood066_1K-JPG_Color.jpg'); // Ruta de textura
-    const ballTexture = textureLoader.load('Plastic013A_1K-JPG_Color.jpg');
+    //const ballTexture = textureLoader.load('Plastic013A_1K-JPG_Color.jpg');
+    const ballTexture = textureLoader.load('ball.jpg');
     const groundTexture = textureLoader.load('fabrics_0075_color_1k.jpg');
     const mushroomTexture = textureLoader.load('Plaster001_1K-JPG_Color.jpg');
 
@@ -58,7 +59,7 @@
     wallTexture.wrapT = THREE.RepeatWrapping;
     wallTexture.repeat.set(4, 1); // Repetir la textura 4 veces en el ancho y 1 vez en la altura
     const wallThickness = 0.5;
-    const wallHeight = 1;
+    const wallHeight = 0.7;
     
     // Paredes laterales
     const wall1 = new THREE.Mesh(new THREE.BoxGeometry(20, wallHeight, wallThickness), wallMaterial);
@@ -299,12 +300,12 @@
       // Rebotar contra las paredes (X y Z)
       if (pelota.position.x > 9.50 || pelota.position.x < -9.50) {
         velocidad.x *= -1; // Invertir la dirección X
-        velocidad.multiplyScalar(0.9); // Simular fricción
+        velocidad.multiplyScalar(0.91); // Simular fricción
       }
 
       if (pelota.position.z > 4.50 || pelota.position.z < -4.50) {
         velocidad.z *= -1; // Invertir la dirección Z
-        velocidad.multiplyScalar(0.9); // Simular fricción
+        velocidad.multiplyScalar(0.91); // Simular fricción
       }
 
       // Aplicar fricción gradual
@@ -317,28 +318,62 @@
     }
 
     function actualizarRotacionPelota(deltaTime) {
-      // Asegúrate de que las variables velocidad y pelota existan y estén inicializadas
-      if (!velocidad || !pelota) return;
+    // Asegúrate de que las variables velocidad y pelota existan y estén inicializadas
+    if (!velocidad || !pelota) return;
 
-      // Velocidad angular calculada en base a la velocidad de la pelota
-      const velocidadMagnitud = velocidad.length();
-      const radioPelota = pelota.geometry.parameters.radius; // Asegúrate de usar el radio correcto
-      const rotacionAngular = (velocidadMagnitud / radioPelota) * deltaTime;
+    // Velocidad angular calculada en base a la velocidad de la pelota
+    const velocidadMagnitud = velocidad.length();
+    const radioPelota = pelota.geometry.parameters.radius || 0.5; // Usa un radio por defecto si no está definido
 
-      // Dirección de la rotación en función del movimiento de la pelota
-      const ejeRotacion = new THREE.Vector3(velocidad.z, 0, -velocidad.x).normalize();
+    // Factor de escala para hacer la rotación más visible
+    const factorEscalaRotacion = 10; // Incrementa este valor para una rotación más perceptible
+    const rotacionAngular = (velocidadMagnitud / radioPelota) * deltaTime * factorEscalaRotacion;
 
-      // Aplica la rotación a la pelota
-      pelota.rotateOnWorldAxis(ejeRotacion, rotacionAngular);
-    }
+    // Dirección de la rotación en función del movimiento de la pelota
+    const ejeRotacion = new THREE.Vector3(velocidad.z, 0, -velocidad.x).normalize();
+
+    // Aplica la rotación a la pelota
+    pelota.rotateOnWorldAxis(ejeRotacion, rotacionAngular);
+  }
 
 
-    // Configurar la cámara para seguir la pelota desde un ángulo 3D
-    function actualizarCamara() {
-      const offset = new THREE.Vector3(-5, 10, 5); // Posición relativa (detrás y arriba)
-      camera.position.copy(pelota.position.clone().add(offset)); // Seguir la pelota
-      camera.lookAt(pelota.position); // Enfocar siempre la pelota
-    }
+
+// Variables para controlar el offset de la cámara
+let offsetX = -5; // Posición horizontal relativa
+let offsetY = 10; // Altura de la cámara
+let offsetZ = 5;  // Posición hacia adelante/atrás
+
+// Listener para manejar las teclas presionadas
+window.addEventListener("keydown", (event) => {
+  switch (event.key) {
+    case "ArrowUp": // Incrementar altura
+      offsetY += 1;
+      break;
+    case "ArrowDown": // Reducir altura
+      offsetY -= 1;
+      break;
+    case "ArrowLeft": // Mover la cámara a la izquierda
+      offsetX -= 1;
+      break;
+    case "ArrowRight": // Mover la cámara a la derecha
+      offsetX += 1;
+      break;
+    case "w": // Acercar la cámara
+      offsetZ -= 1;
+      break;
+    case "s": // Alejar la cámara
+      offsetZ += 1;
+      break;
+  }
+});
+
+// Función para actualizar la posición de la cámara
+function actualizarCamara() {
+  const offset = new THREE.Vector3(offsetX, offsetY, offsetZ); // Usar el offset dinámico
+  camera.position.copy(pelota.position.clone().add(offset)); // Seguir la pelota
+  camera.lookAt(pelota.position); // Enfocar siempre la pelota
+}
+
 
     const clock = new THREE.Clock();
     
