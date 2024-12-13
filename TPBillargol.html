@@ -105,14 +105,16 @@
 
     // Crear hongos y agregarlos al grupo
     function createHongo(x, z) {
-      const hongoGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1, 32);
-      const hongoMaterial = new THREE.MeshStandardMaterial({
-        map: mushroomTexture, // Asignar la textura al material
-    });
-      const hongo = new THREE.Mesh(hongoGeometry, hongoMaterial);
-      hongo.position.set(x, 0.5, z); // Elevarlos ligeramente sobre la mesa
-      hongos.add(hongo); // Agregar al grupo
+        const hongoGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1, 32);
+        const hongoMaterial = new THREE.MeshStandardMaterial({
+            map: mushroomTexture, // Asignar la textura al material
+        });
+        const hongo = new THREE.Mesh(hongoGeometry, hongoMaterial);
+        hongo.position.set(x, 0.5, z); // Elevarlos ligeramente sobre la mesa
+        hongo.boundingSphere = new THREE.Sphere(hongo.position.clone(), 0.2); // Asignar boundingSphere
+        hongos.add(hongo); // Agregar al grupo
     }
+
 
 
     // Distribuir hongos centrales
@@ -252,21 +254,24 @@
       boundingPelota.center.copy(pelota.position);
 
       hongos.children.forEach(hongo => {
-        if (boundingPelota.intersectsSphere(hongo.boundingSphere)) {
-          // Calcular el vector normal del rebote en el plano x-z
-          const normal = new THREE.Vector3().subVectors(pelota.position, hongo.position);
-          normal.y = 0; // Ignorar la componente vertical
-          normal.normalize();
+          if (hongo.boundingSphere) { // Verificar si está definida
+              if (boundingPelota.intersectsSphere(hongo.boundingSphere)) {
+                  console.log('Colisión detectada con un hongo');
+                  // Calcular el vector normal del rebote en el plano x-z
+                  const normal = new THREE.Vector3().subVectors(pelota.position, hongo.position);
+                  normal.y = 0; // Ignorar la componente vertical
+                  normal.normalize();
 
-          // Reflejar la velocidad en la normal
-          velocidad.reflect(normal);
-          velocidad.y = 0; // Asegurarse de que la velocidad no tenga componente en Y
-          velocidad.multiplyScalar(0.98); // Reducir ligeramente la velocidad tras el rebote
+                  // Reflejar la velocidad en la normal
+                  velocidad.reflect(normal);
+                  velocidad.y = 0; // Asegurarse de que la velocidad no tenga componente en Y
+                  velocidad.multiplyScalar(0.98); // Reducir ligeramente la velocidad tras el rebote
 
-          // Asegurarse de que la velocidad no sea demasiado pequeña
-          if (Math.abs(velocidad.x) < 0.05) velocidad.x = Math.sign(velocidad.x) * 0.01;
-          if (Math.abs(velocidad.z) < 0.05) velocidad.z = Math.sign(velocidad.z) * 0.01;
-        }
+                  // Asegurarse de que la velocidad no sea demasiado pequeña
+                  if (Math.abs(velocidad.x) < 0.05) velocidad.x = Math.sign(velocidad.x) * 0.01;
+                  if (Math.abs(velocidad.z) < 0.05) velocidad.z = Math.sign(velocidad.z) * 0.01;
+              }
+          }
       });
     }
 
@@ -364,8 +369,14 @@ window.addEventListener("keydown", (event) => {
     case "s": // Alejar la cámara
       offsetZ += 1;
       break;
+    case "h": // Generar posiciones aleatorias dentro de los límites de la mesa
+      const randomX = (Math.random() * 19) - 9.5; // -9.5 a 9.5
+      const randomZ = (Math.random() * 9) - 4.5;  // -4.5 a 4.5
+      createHongo(randomX, randomZ);
+      break;
   }
 });
+
 
 // Función para actualizar la posición de la cámara
 function actualizarCamara() {

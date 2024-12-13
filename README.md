@@ -22,3 +22,4 @@ Este proyecto es una simulación básica del juego tradicional **Billargol**, de
 | w      | Acercar |
 | s      | Alejar |
 | Click      | Golpear pelota |
+| h      | Aparecer Hongo Aleatorio |
