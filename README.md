@@ -11,7 +11,7 @@ Este proyecto es una simulación básica del juego tradicional **Billargol**, de
 
 ### ¿Cómo probar?
 
-- [Click aquí para probar](https://raw.githack.com/gonzayb/BillarGol-ThreeJS/main/TPBillargol.html)
+- [Click aquí para probar](https://rawcdn.githack.com/gonzayb/BillarGol-ThreeJS/main/TPBillargol.html)
 
 | Tecla        | Acción                |
 | ------------- |:-------------:|
